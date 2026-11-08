@@ -14,7 +14,11 @@ main{max-width:640px;margin:0 auto;padding:16px;display:grid;gap:16px}
 h1{font-size:1.1rem;margin:0 0 12px}
 h1 b{display:inline-block;width:26px;height:26px;line-height:26px;text-align:center;border-radius:50%;background:var(--acc);color:var(--acc-ink);font-size:.85rem;margin-right:8px}
 select,input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
-select{width:100%}
+select{width:100%;min-width:0;max-width:100%}
+[hidden]{display:none!important}
+.add>*{min-width:0}
+.hint.warn{color:var(--warn)}
+.banner{border-color:var(--warn);color:var(--warn)}
 .add{display:grid;grid-template-columns:1fr 100px;gap:8px}
 .add button{grid-column:1/-1}
 small,.mute{color:var(--mute)}
@@ -38,16 +42,17 @@ li span.warn{color:var(--warn)}
 </head>
 <body>
 <main>
+  <section class="card banner" id="banner" hidden></section>
   <section class="card">
     <h1><b>1</b>Jenis kejahatan</h1>
-    <select id="kasus"></select>
+    <select id="kasus" autocomplete="off"></select>
   </section>
 
   <section class="card">
     <h1><b>2</b>Evidence suspect</h1>
     <div class="add">
-      <select id="ev"></select>
-      <input type="number" id="qty" min="1" inputmode="numeric" placeholder="Jumlah">
+      <select id="ev" autocomplete="off"></select>
+      <input type="number" id="qty" autocomplete="off" min="1" inputmode="numeric" placeholder="Jumlah">
       <button class="btn" id="tambah">Tambah evidence</button>
     </div>
     <p class="hint" id="hint"></p>
@@ -90,6 +95,12 @@ const KASUS = [
 const ITEMS = EVIDENCE.flatMap(e => e.tipe === "pilih"
   ? e.opsi.map(([t, id]) => ({ id: e.id + ":" + id, kat: e.kat, nama: t, tipe: "cek", pasal: () => [[id, 1]] })) : [e]);
 const byId = Object.fromEntries(ITEMS.map(e => [e.id, e]));
+const hilang = [...new Set(KASUS.flatMap(k => k[1]))].filter(id => !byId[id]);
+if (hilang.length || !PASAL.GANG) {
+  $("#banner").hidden = false;
+  $("#banner").textContent = "data.js di folder ini versi lama dan tidak cocok dengan index.html" +
+    (hilang.length ? " (evidence belum ada: " + hilang.join(", ") + ")" : "") + ". Ganti dengan data.js terbaru, lalu refresh keras (Ctrl+F5).";
+}
 let kasus = KASUS[0], jml = {}, auto = new Set(), ganti = false;
 const sembunyi = e => e.id === (kasus[2] ? "obstruct" : "accessory");
 
@@ -103,6 +114,7 @@ function gambarOpsi() {
 function gantiHint() {
   const e = byId[$("#ev").value];
   $("#qty").hidden = !!e && e.tipe === "cek";
+  $("#hint").classList.remove("warn");
   $("#hint").textContent = !e ? "" : e.tipe === "cek" ? "Tinggal tekan Tambah evidence." : `Satuan: ${e.satuan}${e.tiers ? " · " + batas(e) : ""}`;
 }
 function gambarRows() {
@@ -120,7 +132,7 @@ function hitung() {
   ITEMS.forEach(e => !sembunyi(e) && jml[e.id] > 0 && e.pasal(jml[e.id]).forEach(tambah));
   const tot = TOTAL(jml); tot.forEach(tambah);
   if (ganti && tot.some(t => ["(6)04", "(6)05", "(6)08"].includes(t[0]))) ["(6)00", "(6)01", "(6)02", "(6)03"].forEach(id => peta.delete(id));
-  return [...peta].map(([id, { n, ket }]) => ({ id, n, ket, ...PASAL[id] }));
+  return [...peta].filter(([id]) => PASAL[id]).map(([id, { n, ket }]) => ({ id, n, ket, ...PASAL[id] }));
 }
 const info = p => p.cv ? "COURT VERDICT" : p.fine == null ? "Nominal belum diisi" : `${rp(p.fine * p.n)} · ${p.sentence * p.n} ${SATUAN_SENTENCE}`;
 function ringkas() {
@@ -150,16 +162,20 @@ $("#kasus").innerHTML = KASUS.map((k, i) => `<option value="${i}">${k[0]}</optio
 $("#kasus").onchange = e => {
   auto.forEach(id => delete jml[id]); auto.clear();
   kasus = KASUS[+e.target.value];
-  kasus[1].forEach(id => { if (!jml[id]) { jml[id] = 1; auto.add(id); } });
-  Object.keys(jml).forEach(id => sembunyi(byId[id]) && delete jml[id]);
+  kasus[1].filter(id => byId[id]).forEach(id => { if (!jml[id]) { jml[id] = 1; auto.add(id); } });
+  Object.keys(jml).forEach(id => byId[id] && sembunyi(byId[id]) && delete jml[id]);
   gambarOpsi(); gambarRows(); gambarHasil();
 };
 $("#ev").onchange = gantiHint;
+const pesan = t => { $("#hint").textContent = t; $("#hint").classList.add("warn"); };
 $("#tambah").onclick = () => {
-  const e = byId[$("#ev").value]; if (!e) return;
-  const q = e.tipe === "cek" ? 1 : Math.max(0, Math.floor(+$("#qty").value) || 0);
-  if (!q) { $("#qty").focus(); return; }
-  jml[e.id] = e.tipe === "cek" ? 1 : (jml[e.id] || 0) + q;
+  const e = byId[$("#ev").value];
+  if (!e) return pesan("Pilih evidence dulu.");
+  const cek = e.tipe === "cek";
+  const q = cek ? 1 : Math.max(0, Math.floor(+$("#qty").value) || 0);
+  if (!q) { $("#qty").focus(); return pesan(`Isi jumlahnya dulu (${e.satuan}).`); }
+  if (cek && jml[e.id]) return pesan("Evidence ini sudah ada di daftar.");
+  jml[e.id] = cek ? 1 : (jml[e.id] || 0) + q;
   auto.delete(e.id); $("#qty").value = ""; $("#ev").value = ""; gantiHint(); gambarRows(); gambarHasil();
 };
 $("#rows").oninput = e => {
@@ -176,6 +192,7 @@ $("#salin").onclick = async e => {
   try { await navigator.clipboard.writeText(teks()); e.target.textContent = "Tersalin"; } catch { e.target.textContent = "Gagal menyalin"; }
   setTimeout(() => (e.target.textContent = "Salin"), 1200);
 };
+$("#kasus").value = 0; $("#ganti").checked = false;
 gambarOpsi(); gambarRows(); gambarHasil();
 </script>
 </body>
