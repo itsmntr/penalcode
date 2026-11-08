@@ -49,26 +49,35 @@ const PASAL = {
   "(8)33": { nama: "Unlawful Possession of an Illegal Racing Device", fine: 3570, sentence: 20 },
 
   // --- Perampokan (Penal Code Quick Reference, pamanahrasa) ---
-  "ROB-LTD": kosong("Commercial Robbery"),
-  "ROB-FLEECA": kosong("Public Bank Robbery"),
-  "ROB-MAJOR": kosong("Major Property Robbery"),
-  "ROB-FEDERAL": kosong("Federal Bank Robbery"),
-  "ROB-RUMAH": kosong("Burglary (10-31A)"),
-  "ROB-JEWEL": kosong("Vangelico Property Robbery"),
-  "HOST": kosong("Hostages (1–2 sandera)"),
-  "AHOST": kosong("Aggravated Hostages (3–4 sandera)", "Handbook hanya mencantumkan sampai 4 sandera; lebih dari itu ikuti arahan IC"),
-  "RESIST": kosong("Resisting Arrest (membawa kabur mobil)"),
+  "ROB-LTD": { kode: "(3)08", nama: "Commercial Robbery", fine: 8000, sentence: 20 },
+  "ROB-FLEECA": { kode: "(3)13", nama: "Grand Larceny Public Reserve Banks (Fleeca)", fine: 20000, sentence: 20 },
+  "ROB-MAJOR": { kode: "(3)14", nama: "Grand Larceny Major Property Crime", fine: 20000, sentence: 30 },
+  "ROB-FEDERAL": { kode: "(3)12", nama: "Grand Larceny Federal Reserve Banks (Pacific/Blaine/Maze)", fine: 50000, sentence: 50 },
+  "ROB-RUMAH": { kode: "(3)17", nama: "Burglary", fine: 8000, sentence: 15 },
+  "ROB-JEWEL": { kode: "(3)26", nama: "Robbery of Vangelico Property", fine: 20000, sentence: 25 },
+  "HOST": { kode: "(1)24", nama: "Hostages", fine: 3000, sentence: 20, catatan: "1–2 sandera" },
+  "AHOST": { kode: "(1)25", nama: "Aggravated Hostages", fine: 20000, sentence: 35, catatan: "3 sandera atau lebih" },
+  "RESIST": { kode: "(5)07", nama: "Resisting Arrest", fine: 1500, sentence: 5 },
+
+  "DRUGMFG": { kode: "(6)06", nama: "Drug Manufacturing", cv: true },
+
+  "(6)09": { nama: "Drugs Selling", fine: 5000, sentence: 15 },
+  "(7)16": { nama: "Brandishing of a Firearm", fine: 4500, sentence: 7 },
+  "(7)49": { nama: "Usage of Suppressor", fine: 5000, sentence: 20 },
+  "(5)06": { nama: "Evading a Peace Officer", fine: 2500, sentence: 6 },
+  "(8)08": { nama: "Reckless Evading of a Peace Officer", fine: 1000, sentence: 14 },
+  "(3)28": { nama: "ATM Robbery", fine: 1700, sentence: 15 },
 
   // --- Gang ---
-  "GANG": kosong("Gang Related Shooting"),
-  "DRIVEBY": kosong("Drive-by Shooting", "Dipakai jika menembak sambil berkendara"),
-  "CRIMUSE": kosong("Criminal Usage of a Firearm", "Wajib uji GSR"),
-  "AGGBATT": kosong("Aggravated Battery to Government Employee", "Gang sengaja menembak polisi"),
+  "GANG": { kode: "(1)10", nama: "Gang Related Shooting", fine: 30000, sentence: 30 },
+  "DRIVEBY": { kode: "(7)42", nama: "Drive-by Shooting", fine: 1250, sentence: 15 },
+  "CRIMUSE": { kode: "(7)15", nama: "Criminal Use of a Firearm", fine: 1500, sentence: 8, catatan: "Wajib uji GSR" },
+  "AGGBATT": { kode: "(1)32", nama: "Aggravated Battery of a Government Employee", fine: 90000, sentence: 45 },
 
   // --- Obstruction & accomplice ---
-  "TAMPER": kosong("Evidence Tampering", "Perlu indikasi kuat dilakukan sengaja untuk menghilangkan bukti"),
-  "ACCESSORY": kosong("Accessory to Robbery", "Khusus kasus Robbery"),
-  "OBSTRUCT": kosong("Obstruction of Public Duty", "Untuk kasus selain Robbery"),
+  "TAMPER": { kode: "(4)17A", nama: "Evidence Tampering", fine: 30000, sentence: 20, catatan: "Perlu indikasi kuat disengaja; (4)17B adalah versi Court Verdict" },
+  "ACCESSORY": { kode: "(3)27", nama: "Accessory to Robbery", fine: 5000, sentence: 10, catatan: "Khusus kasus Robbery" },
+  "OBSTRUCT": { kode: "(4)20", nama: "Obstruction of Public Duty", fine: 12000, sentence: 20, catatan: "Untuk kasus selain Robbery" },
 };
 
 // pasal(q) mengembalikan [[idPasal, jumlahStack], ...] untuk jumlah q yang ditemukan
@@ -86,13 +95,22 @@ const stack = id => q => [[id, q]];
 
 const EVIDENCE = [
   { id: "sch1", kat: "Narkotika", nama: "Schedule I (Weed Bag, Opium Bag)", satuan: "gram",
-    ...tier("gram", [[60, "(6)00", "Misdemeanor"], [Infinity, "(6)01", "Felony"]], [60]) },
+    ...tier("gram", [[60, "(6)00", "Misdemeanor"], [Infinity, "(6)01", "Felony"]]) },
   { id: "sch2", kat: "Narkotika", nama: "Schedule II (Meth Bag, Cocaine)", satuan: "gram",
-    ...tier("gram", [[100, "(6)02", "Misdemeanor"], [Infinity, "(6)03", "Felony"]], [100]) },
+    ...tier("gram", [[100, "(6)02", "Misdemeanor"], [Infinity, "(6)03", "Felony"]]) },
   { id: "para", kat: "Narkotika", nama: "Alat produksi narkotika (Meth Oven/Table, Bagging Table, Baggy, Planting Pot, Seed, Weed, Phos, Pseudo, Acid, Liquid Meth, Meth)", satuan: "item",
     ...tier("item", [[9, "(6)07A", "Kategori A"], [Infinity, "(6)07B", "Kategori B"]]) },
   { id: "poppy", kat: "Narkotika", nama: "Tanaman poppy", satuan: "kg",
     ...tier("kg", [[100, null, "Tanpa charge"], [199, "(6)10", "Unlawful"], [300, "(6)11", "Felony"], [Infinity, "(6)12", "Aggravated"]]) },
+
+  { id: "drugmfg", kat: "Narkotika", nama: "Memproduksi narkotika (Drug Manufacturing)", tipe: "cek", pasal: () => [["DRUGMFG", 1]] },
+
+  { id: "drugsell", kat: "Narkotika", nama: "Menjual/menawarkan narkoba (Drugs Selling)", tipe: "cek", pasal: () => [["(6)09", 1]] },
+  { id: "brandish", kat: "Senjata & Amunisi", nama: "Brandishing senjata api (mengacungkan di depan umum)", tipe: "cek", pasal: () => [["(7)16", 1]] },
+  { id: "suppress", kat: "Senjata & Amunisi", nama: "Menggunakan suppressor", tipe: "cek", pasal: () => [["(7)49", 1]] },
+  { id: "evade", kat: "Kendaraan", nama: "Kabur dari polisi (Evading a Peace Officer)", tipe: "cek", pasal: () => [["(5)06", 1]] },
+  { id: "recevade", kat: "Kendaraan", nama: "Kabur ugal-ugalan (Reckless Evading)", tipe: "cek", pasal: () => [["(8)08", 1]] },
+  { id: "atm", kat: "Perampokan", nama: "ATM Robbery", tipe: "cek", pasal: () => [["(3)28", 1]] },
 
   { id: "fw1", kat: "Senjata & Amunisi", nama: "Firearm Class 1 (Pistol .50, Ceramic Pistol, X17, Machine Pistol, dll.)", satuan: "pucuk", pasal: stack("(7)03") },
   { id: "fw2", kat: "Senjata & Amunisi", nama: "Firearm Class 2 (SMG, Micro SMG, Pump Shotgun, Sawn Off, Navy Revolver, dll.)", satuan: "pucuk", pasal: stack("(7)04") },
@@ -103,15 +121,15 @@ const EVIDENCE = [
   { id: "ammo", kat: "Senjata & Amunisi", nama: "Amunisi (total semua jenis)", satuan: "butir",
     ...tier("butir", [[300, "(7)19", "Unlawful Possession"], [2000, "(7)20", "Distribution"], [Infinity, "(7)48", "Smuggling"]], [300, 2000]) },
   { id: "vest", kat: "Senjata & Amunisi", nama: "Bulletproof vest", satuan: "buah",
-    ...tier("buah", [[9, "(7)43", "Misdemeanor"], [Infinity, "(7)44", "Felony"]]) },
+    ...tier("buah", [[9, "(7)43", "Misdemeanor"], [Infinity, "(7)44", "Felony"]], [10]) },
   { id: "comp", kat: "Senjata & Amunisi", nama: "Komponen senjata", satuan: "unit",
-    ...tier("unit", [[19, "(7)45", "Misdemeanor"], [Infinity, "(7)46", "Felony"]]) },
+    ...tier("unit", [[19, "(7)45", "Misdemeanor"], [Infinity, "(7)46", "Felony"]], [20]) },
   { id: "destr", kat: "Senjata & Amunisi", nama: "Destructive device (bom pipa, granat, dll.)", satuan: "unit", pasal: stack("(7)10") },
 
   { id: "money", kat: "Uang & Barang", nama: "Uang merah (illegal money)", satuan: "$",
-    ...tier("$", [[49999, "(4)35", "Minor"], [149999, "(4)33", "Third Degree"], [399999, "(4)32", "Second Degree"], [Infinity, "(4)09", "First Degree"]], [400000]) },
+    ...tier("$", [[49999, "(4)35", "Minor"], [149999, "(4)33", "Third Degree"], [399999, "(4)32", "Second Degree"], [Infinity, "(4)09", "First Degree"]], [150000, 400000]) },
   { id: "laundry", kat: "Uang & Barang", nama: "Kartu laundry ilegal", satuan: "kartu",
-    ...tier("kartu", [[10, "(4)36", "Third Degree"], [39, "(4)37", "Second Degree"], [Infinity, "(4)38", "First Degree"]]) },
+    ...tier("kartu", [[10, "(4)36", "Third Degree"], [39, "(4)37", "Second Degree"], [Infinity, "(4)38", "First Degree"]], [40]) },
   { id: "stolen", kat: "Uang & Barang", nama: "Barang curian / hasil rampokan (uang merah TIDAK dihitung di sini)", satuan: "jenis", pasal: stack("(3)10") },
   { id: "stolenid", kat: "Uang & Barang", nama: "ID curian", satuan: "buah", pasal: stack("(3)11") },
   { id: "insignia", kat: "Uang & Barang", nama: "Lencana/seragam/ID aparat tanpa hak", satuan: "buah", pasal: stack("(4)34") },
@@ -139,13 +157,13 @@ const EVIDENCE = [
   { id: "obstruct", kat: "Obstruction", nama: "Menghalangi tugas polisi (non-robbery)", tipe: "cek", pasal: () => [["OBSTRUCT", 1]] },
 ];
 
-// Pasal tambahan dari total gabungan beberapa evidence (handbook: "lebih dari")
+// Pasal tambahan dari total gabungan beberapa evidence (Penal Code: distribution lebih dari 800; smuggling/trafficking sama atau lebih dari 2000/4000)
 const TOTAL = q => {
   const narko = (q.sch1 || 0) + (q.sch2 || 0);
   const senjata = (q.fw1 || 0) + (q.fw2 || 0) + (q.fw3 || 0) + (q.govfw || 0);
   const hasil = [];
-  if (narko > 4000) hasil.push(["(6)05", 1, [`Total narkotika ${narko} gram (>4000)`]]);
-  else if (narko > 2000) hasil.push(["(6)04", 1, [`Total narkotika ${narko} gram (>2000)`]]);
+  if (narko >= 4000) hasil.push(["(6)05", 1, [`Total narkotika ${narko} gram (≥4000)`]]);
+  else if (narko >= 2000) hasil.push(["(6)04", 1, [`Total narkotika ${narko} gram (≥2000)`]]);
   else if (narko > 800) hasil.push(["(6)08", 1, [`Total narkotika ${narko} gram (>800)`]]);
   if (senjata > 8) hasil.push(["(7)36", 1, [`Total ${senjata} pucuk senjata (>8)`]]);
   return hasil;
