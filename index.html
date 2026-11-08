@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kalkulator Pasal LSPD</title>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--ink:#1c1c1a;--mute:#6b6a66;--line:#e1dfd9;--acc:#1f4d7a;--acc-ink:#fff}
+@media(prefers-color-scheme:dark){:root{--bg:#141413;--card:#1d1d1b;--ink:#ecebe7;--mute:#9a9892;--line:#2e2e2b;--acc:#6aa5d8;--acc-ink:#0f1a24}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif}
+main{max-width:960px;margin:0 auto;padding:16px;display:grid;gap:16px}
+@media(min-width:800px){main{grid-template-columns:1fr 360px;align-items:start}}
+h1{font-size:1.25rem;margin:0 0 12px}
+h2{font-size:.8rem;text-transform:uppercase;letter-spacing:.05em;color:var(--mute);margin:16px 0 4px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
+input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+input[type=search]{width:100%}
+.row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.row small{display:block;color:var(--mute)}
+.row input{width:96px;text-align:right;flex:none}
+@media(min-width:800px){aside{position:sticky;top:16px}}
+ul{list-style:none;margin:0;padding:0}
+li{padding:10px 0;border-bottom:1px solid var(--line)}
+li b{display:block}
+li span{display:block;color:var(--mute);font-size:.9rem}
+.total{display:flex;justify-content:space-between;gap:12px;padding-top:12px;font-weight:600}
+.cv{color:var(--mute);font-size:.9rem;margin-top:4px}
+.empty{color:var(--mute)}
+.btn{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--acc);color:var(--acc-ink);font:inherit;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:default}
+.reset{background:none;border:0;color:var(--mute);font:inherit;cursor:pointer;padding:0;float:right}
+</style>
+</head>
+<body>
+<main>
+  <section class="card">
+    <h1>Evidence yang dibawa suspect</h1>
+    <input type="search" id="cari" placeholder="Cari evidence..." autocomplete="off">
+    <div id="daftar"></div>
+  </section>
+  <aside class="card">
+    <h1>Pasal yang dikenakan <button class="reset" id="reset">Reset</button></h1>
+    <ul id="hasil"></ul>
+    <div class="total"><span>Total</span><span id="total">-</span></div>
+    <div class="cv" id="cv"></div>
+    <button class="btn" id="salin" disabled>Salin</button>
+  </aside>
+</main>
+<script src="data.js"></script>
+<script>
+const $ = s => document.querySelector(s);
+const jml = {};
+const rp = n => "$" + n.toLocaleString("id-ID");
+
+function gambarDaftar(q = "") {
+  const kat = {};
+  EVIDENCE.filter(e => e.nama.toLowerCase().includes(q.toLowerCase()))
+    .forEach(e => (kat[e.kat] ||= []).push(e));
+  $("#daftar").innerHTML = Object.entries(kat).map(([k, list]) =>
+    `<h2>${k}</h2>` + list.map(e =>
+      `<label class="row"><span>${e.nama}<small>${e.satuan}</small></span>` +
+      `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${jml[e.id] || ""}"></label>`
+    ).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
+}
+
+function hitung() {
+  const peta = new Map();
+  const tambah = ([id, n]) => peta.set(id, (peta.get(id) || 0) + n);
+  EVIDENCE.forEach(e => jml[e.id] > 0 && e.pasal(jml[e.id]).forEach(tambah));
+  TOTAL(jml).forEach(tambah);
+  return [...peta].map(([id, n]) => ({ id, n, ...PASAL[id] }));
+}
+
+function gambarHasil() {
+  const h = hitung();
+  const biasa = h.filter(p => !p.cv);
+  const cv = h.filter(p => p.cv);
+  const f = biasa.reduce((a, p) => a + p.fine * p.n, 0);
+  const s = biasa.reduce((a, p) => a + p.sentence * p.n, 0);
+  $("#hasil").innerHTML = h.length
+    ? h.map(p => `<li><b>${p.id} ${p.nama}${p.n > 1 ? ` ×${p.n}` : ""}</b>` +
+        `<span>${p.cv ? "COURT VERDICT" : `${rp(p.fine * p.n)} · ${p.sentence * p.n} ${SATUAN_SENTENCE}`}</span>` +
+        (p.catatan ? `<span>${p.catatan}</span>` : "") + `</li>`).join("")
+    : '<li class="empty">Isi jumlah evidence di samping.</li>';
+  $("#total").textContent = biasa.length ? `${rp(f)} · ${s} ${SATUAN_SENTENCE}` : "-";
+  $("#cv").textContent = cv.length ? `+ ${cv.length} pasal Court Verdict (tidak masuk total)` : "";
+  $("#salin").disabled = !h.length;
+  return { h, f, s, cv };
+}
+
+$("#daftar").addEventListener("input", e => {
+  jml[e.target.dataset.id] = Math.max(0, +e.target.value || 0);
+  gambarHasil();
+});
+$("#cari").addEventListener("input", e => gambarDaftar(e.target.value));
+$("#reset").addEventListener("click", () => {
+  Object.keys(jml).forEach(k => delete jml[k]);
+  gambarDaftar($("#cari").value);
+  gambarHasil();
+});
+$("#salin").addEventListener("click", async e => {
+  const { h, f, s, cv } = gambarHasil();
+  const baris = h.map(p => `- ${p.id} ${p.nama}${p.n > 1 ? ` x${p.n}` : ""} ` +
+    (p.cv ? "(Court Verdict)" : `(${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE})`));
+  await navigator.clipboard.writeText(
+    baris.join("\n") + `\nTotal: ${rp(f)} / ${s} ${SATUAN_SENTENCE}` + (cv.length ? ` + ${cv.length} Court Verdict` : ""));
+  e.target.textContent = "Tersalin";
+  setTimeout(() => (e.target.textContent = "Salin"), 1200);
+});
+
+gambarDaftar();
+gambarHasil();
+</script>
+</body>
+</html>
