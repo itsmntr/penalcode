@@ -72,18 +72,27 @@ const PASAL = {
 };
 
 // pasal(q) mengembalikan [[idPasal, jumlahStack], ...] untuk jumlah q yang ditemukan
-const pilih = (q, tingkat) => [[tingkat.find(([maks]) => q <= maks)[1], 1]];
+// tier(satuan, [[batasAtas, idPasal|null, label], ...], [nilaiTepatYangAmbigu])
+// batasAtas inklusif. Nilai tepat di batas yang tidak disebut handbook ditandai ambigu agar dikonfirmasi ke IC.
+const tier = (satuan, tiers, ambigu = []) => ({ tiers, ambigu, pasal: q => {
+  const i = tiers.findIndex(([m]) => q <= m), [m, id, lbl] = tiers[i];
+  if (!id) return [];
+  const ket = [`Tingkat: ${lbl}`];
+  if (isFinite(m)) ket.push(`${(m + 1 - q).toLocaleString("id-ID")} ${satuan} lagi → ${tiers[i + 1][2]}`);
+  if (ambigu.includes(q)) ket.push(`Tepat ${q.toLocaleString("id-ID")} ${satuan}: handbook tidak menyebut batas ini, konfirmasi ke IC`);
+  return [[id, 1, ket]];
+} });
 const stack = id => q => [[id, q]];
 
 const EVIDENCE = [
   { id: "sch1", kat: "Narkotika", nama: "Schedule I (Weed Bag, Opium Bag)", satuan: "gram",
-    pasal: q => pilih(q, [[60, "(6)00"], [Infinity, "(6)01"]]) },
+    ...tier("gram", [[60, "(6)00", "Misdemeanor"], [Infinity, "(6)01", "Felony"]], [60]) },
   { id: "sch2", kat: "Narkotika", nama: "Schedule II (Meth Bag, Cocaine)", satuan: "gram",
-    pasal: q => pilih(q, [[100, "(6)02"], [Infinity, "(6)03"]]) },
+    ...tier("gram", [[100, "(6)02", "Misdemeanor"], [Infinity, "(6)03", "Felony"]], [100]) },
   { id: "para", kat: "Narkotika", nama: "Alat produksi narkotika (Meth Oven/Table, Bagging Table, Baggy, Planting Pot, Seed, Weed, Phos, Pseudo, Acid, Liquid Meth, Meth)", satuan: "item",
-    pasal: q => pilih(q, [[9, "(6)07A"], [Infinity, "(6)07B"]]) },
+    ...tier("item", [[9, "(6)07A", "Kategori A"], [Infinity, "(6)07B", "Kategori B"]]) },
   { id: "poppy", kat: "Narkotika", nama: "Tanaman poppy", satuan: "kg",
-    pasal: q => q <= 100 ? [] : pilih(q, [[199, "(6)10"], [300, "(6)11"], [Infinity, "(6)12"]]) },
+    ...tier("kg", [[100, null, "Tanpa charge"], [199, "(6)10", "Unlawful"], [300, "(6)11", "Felony"], [Infinity, "(6)12", "Aggravated"]]) },
 
   { id: "fw1", kat: "Senjata & Amunisi", nama: "Firearm Class 1 (Pistol .50, Ceramic Pistol, X17, Machine Pistol, dll.)", satuan: "pucuk", pasal: stack("(7)03") },
   { id: "fw2", kat: "Senjata & Amunisi", nama: "Firearm Class 2 (SMG, Micro SMG, Pump Shotgun, Sawn Off, Navy Revolver, dll.)", satuan: "pucuk", pasal: stack("(7)04") },
@@ -92,17 +101,17 @@ const EVIDENCE = [
   { id: "baton", kat: "Senjata & Amunisi", nama: "Baton milik pemerintah", satuan: "buah", pasal: stack("(7)07") },
   { id: "taser", kat: "Senjata & Amunisi", nama: "Taser milik pemerintah", satuan: "buah", pasal: stack("(7)08") },
   { id: "ammo", kat: "Senjata & Amunisi", nama: "Amunisi (total semua jenis)", satuan: "butir",
-    pasal: q => pilih(q, [[300, "(7)19"], [2000, "(7)20"], [Infinity, "(7)48"]]) },
+    ...tier("butir", [[300, "(7)19", "Unlawful Possession"], [2000, "(7)20", "Distribution"], [Infinity, "(7)48", "Smuggling"]], [300, 2000]) },
   { id: "vest", kat: "Senjata & Amunisi", nama: "Bulletproof vest", satuan: "buah",
-    pasal: q => pilih(q, [[9, "(7)43"], [Infinity, "(7)44"]]) },
+    ...tier("buah", [[9, "(7)43", "Misdemeanor"], [Infinity, "(7)44", "Felony"]]) },
   { id: "comp", kat: "Senjata & Amunisi", nama: "Komponen senjata", satuan: "unit",
-    pasal: q => pilih(q, [[19, "(7)45"], [Infinity, "(7)46"]]) },
+    ...tier("unit", [[19, "(7)45", "Misdemeanor"], [Infinity, "(7)46", "Felony"]]) },
   { id: "destr", kat: "Senjata & Amunisi", nama: "Destructive device (bom pipa, granat, dll.)", satuan: "unit", pasal: stack("(7)10") },
 
   { id: "money", kat: "Uang & Barang", nama: "Uang merah (illegal money)", satuan: "$",
-    pasal: q => pilih(q, [[49999, "(4)35"], [149999, "(4)33"], [399999, "(4)32"], [Infinity, "(4)09"]]) },
+    ...tier("$", [[49999, "(4)35", "Minor"], [149999, "(4)33", "Third Degree"], [399999, "(4)32", "Second Degree"], [Infinity, "(4)09", "First Degree"]], [400000]) },
   { id: "laundry", kat: "Uang & Barang", nama: "Kartu laundry ilegal", satuan: "kartu",
-    pasal: q => pilih(q, [[10, "(4)36"], [39, "(4)37"], [Infinity, "(4)38"]]) },
+    ...tier("kartu", [[10, "(4)36", "Third Degree"], [39, "(4)37", "Second Degree"], [Infinity, "(4)38", "First Degree"]]) },
   { id: "stolen", kat: "Uang & Barang", nama: "Barang curian / hasil rampokan (uang merah TIDAK dihitung di sini)", satuan: "jenis", pasal: stack("(3)10") },
   { id: "stolenid", kat: "Uang & Barang", nama: "ID curian", satuan: "buah", pasal: stack("(3)11") },
   { id: "insignia", kat: "Uang & Barang", nama: "Lencana/seragam/ID aparat tanpa hak", satuan: "buah", pasal: stack("(4)34") },
@@ -130,14 +139,55 @@ const EVIDENCE = [
   { id: "obstruct", kat: "Obstruction", nama: "Menghalangi tugas polisi (non-robbery)", tipe: "cek", pasal: () => [["OBSTRUCT", 1]] },
 ];
 
-// Pasal tambahan dari total gabungan beberapa evidence
+// Pasal tambahan dari total gabungan beberapa evidence (handbook: "lebih dari")
 const TOTAL = q => {
   const narko = (q.sch1 || 0) + (q.sch2 || 0);
   const senjata = (q.fw1 || 0) + (q.fw2 || 0) + (q.fw3 || 0) + (q.govfw || 0);
   const hasil = [];
-  if (narko > 4000) hasil.push(["(6)05", 1]);
-  else if (narko > 2000) hasil.push(["(6)04", 1]);
-  else if (narko > 800) hasil.push(["(6)08", 1]);
-  if (senjata > 8) hasil.push(["(7)36", 1]);
+  if (narko > 4000) hasil.push(["(6)05", 1, [`Total narkotika ${narko} gram (>4000)`]]);
+  else if (narko > 2000) hasil.push(["(6)04", 1, [`Total narkotika ${narko} gram (>2000)`]]);
+  else if (narko > 800) hasil.push(["(6)08", 1, [`Total narkotika ${narko} gram (>800)`]]);
+  if (senjata > 8) hasil.push(["(7)36", 1, [`Total ${senjata} pucuk senjata (>8)`]]);
   return hasil;
+};
+
+// Jenis incident: saran = evidence yang dicentang otomatis; cek = checklist dari handbook Pamanahrasa
+const INCIDENT = {
+  gang: { nama: "Gang War / Shootout (10-71)", saran: ["gang", "crimuse"], cek: [
+    "Lapor 10-71, Code 3 untuk seluruh unit",
+    "Unit pertama dilarang menerobos area baku tembak; tunggu di perimeter luar",
+    "Bentuk barikade agar sipil tidak masuk kill zone",
+    "Setelah mereda: sterilisasi dan search TKP",
+    "Suspect tergeletak: evakuasi medis lalu bawa ke Sector A (Alta/MRPD)",
+    "Uji GSR dan amankan bukti senjata (Take Evidence) lebih dulu",
+    "Foto barang bawaan dan hasil GSR sebelum suspect dibangunkan",
+    "Borgol, bacakan Miranda Rights",
+    "Input bukti dan charge di MDT sesuai ID incident"] },
+  ois: { nama: "Officer Involved Shooting", saran: ["aggbatt", "crimuse"],
+    catatan: "Handbook tidak punya SOP khusus OIS; checklist disusun dari item terkait.", cek: [
+    "Officer down: 10-13A (tertembak/darurat) atau 10-13B (kecelakaan/pingsan); 10-80 bila tidak bisa merespons",
+    "10-52 panggil EMS segera, minta 10-78 backup dan Code 3",
+    "Amankan TKP, kumpulkan dan foto barang bukti",
+    "GSR test pada suspect dan dokumentasi sebelum suspect dibangunkan",
+    "Sengaja menembak polisi: Aggravated Battery to Government Employee + Criminal Usage of Firearm",
+    "IC mengawasi keaslian bukti sampai diserahkan ke Alta/MRPD"] },
+  robbery: { nama: "Robbery", saran: ["resist"], cek: [
+    "10-23 tiba di lokasi, laporkan kondisi dan perkiraan jumlah suspect, bangun containment",
+    "Ada sandera: negosiasi dan tunggu IC. Tanpa sandera: breach-in diizinkan",
+    "IC ambil alih: panggilan dispatch dan tetapkan saluran TAC sesuai jumlah kendaraan suspect",
+    "Suspect kabur berkendara: Prosedur Pursuit, tunjuk Primary dan Secondary",
+    "Batas pengejar: 1 kendaraan 4-5 unit, 2 kendaraan 8-10 unit",
+    "Cocokkan Robbery Matrix (min polisi, max criminal, weapon class, helikopter)"] },
+  pursuit: { nama: "Pursuit (10-57)", saran: ["resist"], cek: [
+    "Lapor 10-57 + 10-78; format arah: Action → Arah → Nama Jalan → Info Tambahan",
+    "Primary fokus mengemudi tanpa call-out; Secondary jadi navigator radio",
+    "PIT hanya atas izin IC/Sersan: lebih dari 10 menit, tanpa sandera hidup, jalan aman",
+    "Hot Pursuit bila lebih dari 10 menit atau lompatan tidak logis berulang",
+    "Ganti kendaraan, masuk air, atau di lokasi kasus: Impound Sita atas persetujuan IC"] },
+  narkoba: { nama: "Narkotika / Suspicious Activity (10-34)", saran: [], cek: [
+    "Pantau transaksi, interogasi lisan di tempat, frisk subjek",
+    "Suspect kabur: ubah ke 10-57 dan minta 10-78",
+    "Sita narkotika dan uang merah, foto bukti, input MDT",
+    "Kendaraan terkait narkotika: baca NOTES sebelum release vehicle",
+    "Total gram menentukan Possession, Distribution, Smuggling, atau Trafficking"] },
 };

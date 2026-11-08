@@ -33,106 +33,143 @@ li span{display:block;color:var(--mute);font-size:.9rem}
 .btn{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--acc);color:var(--acc-ink);font:inherit;cursor:pointer}
 .btn:disabled{opacity:.4;cursor:default}
 .reset{background:none;border:0;color:var(--mute);font:inherit;cursor:pointer;padding:0;float:right}
+.tabs{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.tab{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
+.tab.on{background:var(--acc);color:var(--acc-ink);border-color:var(--acc)}
+.f{display:grid;gap:8px;margin-bottom:8px}
+.f select,.f input{width:100%}
+.ck{display:flex;gap:8px;padding:6px 0;font-size:.92rem}.ck input{flex:none;margin-top:3px}
+.warn{color:#b45309}.ghost{background:none;border:1px solid var(--line);color:var(--ink);margin-top:8px}
 </style>
 </head>
 <body>
 <main>
+  <div>
   <section class="card">
-    <h1>Evidence yang dibawa suspect</h1>
+    <h1>Incident</h1>
+    <div class="f">
+      <select id="jenis"></select>
+      <input id="lokasi" placeholder="Lokasi (jalan / TKP)">
+      <input id="ic" placeholder="Incident Commander / callsign">
+      <input id="ringkas" placeholder="Ringkasan singkat kejadian">
+    </div>
+    <div id="catat" class="cv"></div>
+    <h2>Checklist handbook</h2>
+    <div id="cek"></div>
+  </section>
+  <section class="card" style="margin-top:16px">
+    <h1>Suspect &amp; evidence</h1>
+    <div class="tabs" id="tabs"></div>
+    <div class="f"><input id="nama" placeholder="Nama suspect"></div>
+    <button class="btn ghost" id="saran">Terapkan saran pasal untuk incident ini</button>
+    <label class="ck"><input type="checkbox" id="ganti"><span>Distribution/Smuggling/Trafficking menggantikan Possession narkotika (centang bila aturan server begitu)</span></label>
     <input type="search" id="cari" placeholder="Cari evidence..." autocomplete="off">
     <div id="daftar"></div>
   </section>
+  </div>
   <aside class="card">
-    <h1>Pasal yang dikenakan <button class="reset" id="reset">Reset</button></h1>
+    <h1>Pasal untuk <span id="who"></span> <button class="reset" id="reset">Reset</button></h1>
     <ul id="hasil"></ul>
     <div class="total"><span>Total</span><span id="total">-</span></div>
     <div class="cv" id="cv"></div>
-    <button class="btn" id="salin" disabled>Salin</button>
+    <button class="btn" id="salin" disabled>Salin incident (semua suspect)</button>
   </aside>
 </main>
 <script src="data.js"></script>
 <script>
 const $ = s => document.querySelector(s);
-const jml = {};
 const rp = n => "$" + n.toLocaleString("id-ID");
 const kode = p => p.kode === undefined ? p.id + " " : (p.kode ? p.kode + " " : "");
-const aktif = e => e.tipe === "pilih" ? !!jml[e.id] : jml[e.id] > 0;
+const insiden = { jenis: "gang" }, selesai = {}, opt = { ganti: false };
+let suspects = [{ nama: "", jml: {} }], ai = 0, jml = suspects[0].jml;
+const sembunyi = e => e.id === (insiden.jenis === "robbery" ? "obstruct" : "accessory");
+const aktif = (e, j) => e.tipe === "pilih" ? !!j[e.id] : j[e.id] > 0;
+const batas = e => e.tiers ? e.tiers.map(([m, , s], i) => `${s} ${i ? e.tiers[i - 1][0] + 1 : 0}${isFinite(m) ? "–" + m : "+"}`).join(" · ") : "";
+const namaS = (s, i) => s.nama || `Suspect ${i + 1}`;
 
-function gambarDaftar(q = "") {
-  const kat = {};
-  EVIDENCE.filter(e => (e.nama + " " + e.kat).toLowerCase().includes(q.toLowerCase()))
-    .forEach(e => (kat[e.kat] ||= []).push(e));
-  $("#daftar").innerHTML = Object.entries(kat).map(([k, list]) =>
-    `<h2>${k}</h2>` + list.map(kolom).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
+function gambarDaftar() {
+  const q = $("#cari").value.toLowerCase(), kat = {};
+  EVIDENCE.filter(e => !sembunyi(e) && (e.nama + " " + e.kat).toLowerCase().includes(q)).forEach(e => (kat[e.kat] ||= []).push(e));
+  $("#daftar").innerHTML = Object.entries(kat).map(([k, l]) => `<h2>${k}</h2>` + l.map(kolom).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
 }
-
 function kolom(e) {
   const v = jml[e.id];
-  if (e.tipe === "cek")
-    return `<label class="row"><span>${e.nama}</span><input type="checkbox" data-id="${e.id}"${v ? " checked" : ""}></label>`;
-  if (e.tipe === "pilih")
-    return `<label class="row"><span>${e.nama}</span><select data-id="${e.id}"><option value="">Tidak ada</option>` +
-      e.opsi.map(([t, id]) => `<option value="${id}"${v === id ? " selected" : ""}>${t}</option>`).join("") + `</select></label>`;
-  return `<label class="row"><span>${e.nama}<small>${e.satuan}</small></span>` +
+  if (e.tipe === "cek") return `<label class="row"><span>${e.nama}</span><input type="checkbox" data-id="${e.id}"${v ? " checked" : ""}></label>`;
+  if (e.tipe === "pilih") return `<label class="row"><span>${e.nama}</span><select data-id="${e.id}"><option value="">Tidak ada</option>` +
+    e.opsi.map(([t, id]) => `<option value="${id}"${v === id ? " selected" : ""}>${t}</option>`).join("") + `</select></label>`;
+  return `<label class="row"><span>${e.nama}<small>${e.satuan}${e.tiers ? " · " + batas(e) : ""}</small></span>` +
     `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${v || ""}"></label>`;
 }
+function gambarInsiden() {
+  const I = INCIDENT[insiden.jenis];
+  $("#catat").textContent = I.catatan || "";
+  $("#cek").innerHTML = I.cek.map((t, i) => `<label class="ck"><input type="checkbox" data-k="${insiden.jenis}:${i}"${selesai[insiden.jenis + ":" + i] ? " checked" : ""}><span>${t}</span></label>`).join("");
+}
+function gambarTabs() {
+  $("#tabs").innerHTML = suspects.map((s, i) => `<button class="tab${i === ai ? " on" : ""}" data-i="${i}">${namaS(s, i)}</button>`).join("") +
+    `<button class="tab" data-add="1">+ Suspect</button>` + (suspects.length > 1 ? `<button class="tab" data-del="1">Hapus</button>` : "");
+  $("#nama").value = suspects[ai].nama; $("#who").textContent = namaS(suspects[ai], ai);
+}
+function pilihSuspect(i) { ai = i; jml = suspects[i].jml; gambarTabs(); gambarDaftar(); gambarHasil(); }
 
-function hitung() {
+function hitung(j) {
   const peta = new Map();
-  const tambah = ([id, n]) => peta.set(id, (peta.get(id) || 0) + n);
-  EVIDENCE.forEach(e => aktif(e) && e.pasal(jml[e.id]).forEach(tambah));
-  TOTAL(jml).forEach(tambah);
-  return [...peta].map(([id, n]) => ({ id, n, ...PASAL[id] }));
+  const tambah = ([id, n, ket = []]) => { const p = peta.get(id) || { n: 0, ket: [] }; p.n += n; p.ket.push(...ket); peta.set(id, p); };
+  EVIDENCE.forEach(e => !sembunyi(e) && aktif(e, j) && e.pasal(j[e.id]).forEach(tambah));
+  const tot = TOTAL(j); tot.forEach(tambah);
+  if (opt.ganti && tot.some(t => ["(6)04", "(6)05", "(6)08"].includes(t[0]))) ["(6)00", "(6)01", "(6)02", "(6)03"].forEach(id => peta.delete(id));
+  return [...peta].map(([id, { n, ket }]) => ({ id, n, ket, ...PASAL[id] }));
 }
-
+function ringkas(j) {
+  const h = hitung(j), cv = h.filter(p => p.cv), tanpa = h.filter(p => !p.cv && p.fine == null), biasa = h.filter(p => !p.cv && p.fine != null);
+  return { h, cv, tanpa, biasa, f: biasa.reduce((a, p) => a + p.fine * p.n, 0), s: biasa.reduce((a, p) => a + p.sentence * p.n, 0) };
+}
+const info = p => p.cv ? "COURT VERDICT" : p.fine == null ? "Nominal belum diisi" : `${rp(p.fine * p.n)} · ${p.sentence * p.n} ${SATUAN_SENTENCE}`;
 function gambarHasil() {
-  const h = hitung();
-  const cv = h.filter(p => p.cv);
-  const tanpa = h.filter(p => !p.cv && p.fine == null);
-  const biasa = h.filter(p => !p.cv && p.fine != null);
-  const f = biasa.reduce((a, p) => a + p.fine * p.n, 0);
-  const s = biasa.reduce((a, p) => a + p.sentence * p.n, 0);
-  const info = p => p.cv ? "COURT VERDICT" : p.fine == null ? "Nominal belum diisi" : `${rp(p.fine * p.n)} · ${p.sentence * p.n} ${SATUAN_SENTENCE}`;
-  $("#hasil").innerHTML = h.length
-    ? h.map(p => `<li><b>${kode(p)}${p.nama}${p.n > 1 ? ` ×${p.n}` : ""}</b><span>${info(p)}</span>` +
-        (p.catatan ? `<span>${p.catatan}</span>` : "") + `</li>`).join("")
-    : '<li class="empty">Isi jumlah evidence di samping.</li>';
+  const { h, cv, tanpa, biasa, f, s } = ringkas(jml);
+  $("#hasil").innerHTML = h.length ? h.map(p => `<li><b>${kode(p)}${p.nama}${p.n > 1 ? ` ×${p.n}` : ""}</b><span>${info(p)}</span>` +
+    [...new Set(p.ket)].map(k => `<span${k.startsWith("Tepat") ? ' class="warn"' : ""}>${k}</span>`).join("") +
+    (p.catatan ? `<span>${p.catatan}</span>` : "") + `</li>`).join("") : '<li class="empty">Isi jumlah evidence di samping.</li>';
   $("#total").textContent = biasa.length ? `${rp(f)} · ${s} ${SATUAN_SENTENCE}` : "-";
-  $("#cv").textContent = [cv.length && `+ ${cv.length} pasal Court Verdict (tidak masuk total)`,
+  $("#cv").textContent = [cv.length && `+ ${cv.length} pasal Court Verdict (tidak masuk total); lihat Alur Court Verdict di handbook`,
     tanpa.length && `+ ${tanpa.length} pasal belum ada nominal (tidak masuk total)`].filter(Boolean).join("\n");
-  $("#salin").disabled = !h.length;
-  return { h, f, s, cv, tanpa };
+  $("#salin").disabled = !suspects.some(x => ringkas(x.jml).h.length);
+}
+function teks() {
+  const I = INCIDENT[insiden.jenis], v = id => $(id).value.trim();
+  const kepala = [`INCIDENT: ${I.nama}`, v("#lokasi") && `Lokasi: ${v("#lokasi")}`, v("#ic") && `IC: ${v("#ic")}`, v("#ringkas") && `Ringkasan: ${v("#ringkas")}`].filter(Boolean);
+  const blok = suspects.map((x, i) => {
+    const r = ringkas(x.jml);
+    return [`== ${namaS(x, i)} ==`, ...r.h.map(p => `- ${kode(p)}${p.nama}${p.n > 1 ? ` x${p.n}` : ""} (${p.cv ? "Court Verdict" : p.fine == null ? "nominal belum diisi" : `${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE}`})`),
+      `Total: ${rp(r.f)} / ${r.s} ${SATUAN_SENTENCE}` + (r.cv.length ? ` + ${r.cv.length} Court Verdict` : "") + (r.tanpa.length ? ` + ${r.tanpa.length} tanpa nominal` : "")].join("\n");
+  });
+  return kepala.join("\n") + "\n\n" + blok.join("\n\n");
 }
 
-$("#daftar").addEventListener("input", e => {
-  const t = e.target, id = t.dataset.id;
-  if (!id) return;
+$("#jenis").innerHTML = Object.entries(INCIDENT).map(([k, i]) => `<option value="${k}">${i.nama}</option>`).join("");
+$("#jenis").onchange = e => { insiden.jenis = e.target.value; gambarInsiden(); gambarDaftar(); gambarHasil(); };
+$("#cek").onchange = e => { selesai[e.target.dataset.k] = e.target.checked; };
+$("#nama").oninput = e => { suspects[ai].nama = e.target.value; gambarTabs(); $("#nama").focus(); };
+$("#ganti").onchange = e => { opt.ganti = e.target.checked; gambarHasil(); };
+$("#tabs").onclick = e => {
+  const t = e.target.closest("button"); if (!t) return;
+  if (t.dataset.add) { suspects.push({ nama: "", jml: {} }); pilihSuspect(suspects.length - 1); }
+  else if (t.dataset.del) { suspects.splice(ai, 1); pilihSuspect(Math.max(0, ai - 1)); }
+  else pilihSuspect(+t.dataset.i);
+};
+$("#saran").onclick = () => { INCIDENT[insiden.jenis].saran.forEach(id => jml[id] = 1); gambarDaftar(); gambarHasil(); };
+$("#daftar").oninput = e => {
+  const t = e.target, id = t.dataset.id; if (!id) return;
   jml[id] = t.type === "checkbox" ? +t.checked : t.tagName === "SELECT" ? t.value : Math.max(0, +t.value || 0);
   gambarHasil();
-});
-$("#cari").addEventListener("input", e => gambarDaftar(e.target.value));
-$("#reset").addEventListener("click", () => {
-  Object.keys(jml).forEach(k => delete jml[k]);
-  gambarDaftar($("#cari").value);
-  gambarHasil();
-});
-$("#salin").addEventListener("click", async e => {
-  const { h, f, s, cv, tanpa } = gambarHasil();
-  const baris = h.map(p => `- ${kode(p)}${p.nama}${p.n > 1 ? ` x${p.n}` : ""} ` +
-    (p.cv ? "(Court Verdict)" : p.fine == null ? "(nominal belum diisi)" : `(${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE})`));
-  const teks = baris.join("\n") + `\nTotal: ${rp(f)} / ${s} ${SATUAN_SENTENCE}` +
-    (cv.length ? ` + ${cv.length} Court Verdict` : "") + (tanpa.length ? ` + ${tanpa.length} pasal tanpa nominal` : "");
-  try {
-    await navigator.clipboard.writeText(teks);
-    e.target.textContent = "Tersalin";
-  } catch {
-    e.target.textContent = "Gagal menyalin";
-  }
-  setTimeout(() => (e.target.textContent = "Salin"), 1200);
-});
-
-gambarDaftar();
-gambarHasil();
+};
+$("#cari").oninput = gambarDaftar;
+$("#reset").onclick = () => { Object.keys(jml).forEach(k => delete jml[k]); gambarDaftar(); gambarHasil(); };
+$("#salin").onclick = async e => {
+  try { await navigator.clipboard.writeText(teks()); e.target.textContent = "Tersalin"; } catch { e.target.textContent = "Gagal menyalin"; }
+  setTimeout(() => (e.target.textContent = "Salin incident (semua suspect)"), 1200);
+};
+gambarInsiden(); gambarTabs(); gambarDaftar(); gambarHasil();
 </script>
 </body>
 </html>
