@@ -20,6 +20,9 @@ input[type=search]{width:100%}
 .row small{display:block;color:var(--mute)}
 .row input[type=number]{width:96px;text-align:right;flex:none}
 .row input[type=checkbox]{width:24px;height:24px;flex:none;accent-color:var(--acc)}
+.row label{flex:1}
+.ctl{display:flex;gap:8px;align-items:center;flex:none}
+select{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
 @media(min-width:800px){aside{position:sticky;top:16px}}
 ul{list-style:none;margin:0;padding:0}
 li{padding:10px 0;border-bottom:1px solid var(--line)}
@@ -36,7 +39,7 @@ li span{display:block;color:var(--mute);font-size:.9rem}
 <body>
 <main>
   <section class="card">
-    <h1>Jenis kejahatan &amp; evidence <small style="color:var(--mute);font-weight:400">v2</small></h1>
+    <h1>Jenis kejahatan &amp; evidence <small style="color:var(--mute);font-weight:400">v3</small></h1>
     <input type="search" id="cari" placeholder="Cari, misalnya laundromat atau meth" autocomplete="off">
     <div id="daftar"></div>
   </section>
@@ -139,6 +142,9 @@ const tier = (satuan, tiers, ambigu = []) => ({ tiers, ambigu, pasal: q => {
   return [[id, 1, ket]];
 } });
 const stack = id => q => [[id, q]];
+const jmlSenjata = j => (j.fw1 || 0) + (j.fw2 || 0) + (j.fw3 || 0) + (j.govfw || 0);
+// Pasal per pucuk hanya berlaku untuk total 8 pucuk atau kurang; lebih dari itu diganti Weapon Smuggling di TOTAL
+const senjata = id => (q, j) => jmlSenjata(j) > 8 ? [] : [[id, q]];
 const cek = (...ids) => () => ids.map(id => [id, 1]);
 const jenis = (id, nama, ...kode) => ({ id: "j-" + id, kat: "Jenis kejahatan", nama, tipe: "cek", utama: true, pasal: cek(...kode) });
 
@@ -183,20 +189,23 @@ const EVIDENCE = [
     ...tier("kg", [[100, null, "Tanpa charge"], [199, "(6)10", "Unlawful"], [300, "(6)11", "Felony"], [Infinity, "(6)12", "Aggravated"]]) },
 
   { id: "brandish", kat: "Senjata & Amunisi", nama: "Brandishing senjata api (mengacungkan di depan umum)", tipe: "cek", pasal: cek("(7)16") },
-  { id: "suppress", kat: "Senjata & Amunisi", nama: "Menggunakan suppressor", tipe: "cek", pasal: cek("(7)49") },
-  { id: "fw1", kat: "Senjata & Amunisi", nama: "Firearm Class 1 (Pistol .50, Ceramic Pistol, X17, Machine Pistol, dll.)", satuan: "pucuk", pasal: stack("(7)03") },
-  { id: "fw2", kat: "Senjata & Amunisi", nama: "Firearm Class 2 (SMG, Micro SMG, Pump Shotgun, Sawn Off, Navy Revolver, dll.)", satuan: "pucuk", pasal: stack("(7)04") },
-  { id: "fw3", kat: "Senjata & Amunisi", nama: "Firearm Class 3 (Assault Rifle, Carbine, AK47, dll.)", satuan: "pucuk", pasal: stack("(7)05") },
-  { id: "govfw", kat: "Senjata & Amunisi", nama: "Senjata api milik pemerintah/LEO", satuan: "pucuk", pasal: stack("(7)06") },
+  { id: "fw1", kat: "Senjata & Amunisi", nama: "Firearm Class 1 (Pistol .50, Ceramic Pistol, X17, Machine Pistol, dll.)", satuan: "pucuk", pasal: senjata("(7)03") },
+  { id: "fw2", kat: "Senjata & Amunisi", nama: "Firearm Class 2 (SMG, Micro SMG, Pump Shotgun, Sawn Off, Navy Revolver, dll.)", satuan: "pucuk", pasal: senjata("(7)04") },
+  { id: "fw3", kat: "Senjata & Amunisi", nama: "Firearm Class 3 (Assault Rifle, Carbine, AK47, dll.)", satuan: "pucuk", pasal: senjata("(7)05") },
+  { id: "govfw", kat: "Senjata & Amunisi", nama: "Senjata api milik pemerintah/LEO", satuan: "pucuk", pasal: senjata("(7)06") },
   { id: "baton", kat: "Senjata & Amunisi", nama: "Baton milik pemerintah", satuan: "buah", pasal: stack("(7)07") },
   { id: "taser", kat: "Senjata & Amunisi", nama: "Taser milik pemerintah", satuan: "buah", pasal: stack("(7)08") },
   { id: "ammo", kat: "Senjata & Amunisi", nama: "Amunisi (total semua jenis)", satuan: "butir",
     ...tier("butir", [[300, "(7)19", "Unlawful Possession"], [2000, "(7)20", "Distribution"], [Infinity, "(7)48", "Smuggling"]], [300, 2000]) },
   { id: "vest", kat: "Senjata & Amunisi", nama: "Bulletproof vest", satuan: "buah",
     ...tier("buah", [[10, "(7)43", "Misdemeanor"], [Infinity, "(7)44", "Felony"]], [10]) },
-  { id: "comp", kat: "Senjata & Amunisi", nama: "Komponen senjata", satuan: "unit",
-    ...tier("unit", [[20, "(7)45", "Misdemeanor"], [Infinity, "(7)46", "Felony"]], [20]) },
   { id: "destr", kat: "Senjata & Amunisi", nama: "Destructive device (bom pipa, granat, dll.)", satuan: "unit", pasal: stack("(7)10") },
+
+  // Attachment: 1 = terpasang di senjata, 2 = tidak terpasang (dihitung sebagai komponen senjata di TOTAL)
+  { id: "suppress", kat: "Attachment senjata", nama: "Suppressor", tipe: "att", info: "Terpasang: (7)49 Usage of Suppressor", pasal: q => q === 1 ? [["(7)49", 1]] : [] },
+  { id: "scope", kat: "Attachment senjata", nama: "Scope", tipe: "att", info: "Terpasang: tidak ada pasal tersendiri", pasal: () => [] },
+  { id: "mag", kat: "Attachment senjata", nama: "Magazine", tipe: "att", info: "Terpasang: tidak ada pasal tersendiri", pasal: () => [] },
+  { id: "comp", kat: "Attachment senjata", nama: "Komponen senjata lain (tidak terpasang)", satuan: "unit", info: "Dijumlah dengan attachment yang tidak terpasang", pasal: () => [] },
 
   { id: "money", kat: "Uang & Barang", nama: "Uang merah (illegal money)", satuan: "$",
     ...tier("$", [[50000, "(4)35", "Minor"], [149999, "(4)33", "Third Degree"], [399999, "(4)32", "Second Degree"], [Infinity, "(4)09", "First Degree"]], [50000, 150000, 400000]) },
@@ -219,18 +228,29 @@ const EVIDENCE = [
   { id: "obstruct", kat: "Sandera & Perlawanan", nama: "Menghalangi tugas polisi (non-robbery)", tipe: "cek", pasal: cek("(4)20") },
 ];
 
+const COMP = tier("unit", [[20, "(7)45", "Misdemeanor"], [Infinity, "(7)46", "Felony"]], [20]);
+
 // Pasal dari total gabungan. Narkotika: total 800 g ke atas menggantikan pasal possession per schedule.
+// Senjata: lebih dari 8 pucuk menggantikan pasal per pucuk dengan Weapon Smuggling.
 const TOTAL = q => {
   const s1 = (q.weed || 0) + (q.opium || 0), s2 = (q.meth || 0) + (q.cocaine || 0), narko = s1 + s2;
-  const senjata = (q.fw1 || 0) + (q.fw2 || 0) + (q.fw3 || 0) + (q.govfw || 0);
+  const senj = jmlSenjata(q);
   const hasil = [];
   if (narko >= 4000) hasil.push(["(6)05", 1, [`Total narkotika ${narko} gram (4000 ke atas)`]]);
   else if (narko >= 2000) hasil.push(["(6)04", 1, [`Total narkotika ${narko} gram (2000 ke atas)`]]);
   else if (narko >= 800) hasil.push(["(6)08", 1, [`Total narkotika ${narko} gram (800 ke atas)`, ...(narko === 800 ? ["Tepat 800 gram: teks pasal menulis di atas 800, panduan kasus 800 ke atas. Konfirmasi ke IC"] : [])]]);
-  else {
-    [[s1, SCH1], [s2, SCH2]].forEach(([n, t]) => n > 0 && t.pasal(n).forEach(x => hasil.push(x)));
+  else [[s1, SCH1], [s2, SCH2]].forEach(([n, t]) => n > 0 && t.pasal(n).forEach(x => hasil.push(x)));
+
+  if (senj > 8) {
+    const rinci = [["Class 1", q.fw1], ["Class 2", q.fw2], ["Class 3", q.fw3], ["Government", q.govfw]].filter(([, n]) => n).map(([k, n]) => `${n} ${k}`).join(", ");
+    hasil.push(["(7)36", 1, [`${senj} pucuk senjata (${rinci}), lebih dari 8`, "Pasal per pucuk tidak dipakai, diganti Weapon Smuggling"]]);
   }
-  if (senjata > 8) hasil.push(["(7)36", 1, [`Total ${senjata} pucuk senjata (lebih dari 8)`]]);
+
+  const lepas = ["suppress", "scope", "mag"].filter(k => q[k] === 2).length;
+  const komponen = (q.comp || 0) + lepas;
+  if (komponen > 0) COMP.pasal(komponen).forEach(([id, c, ket]) => hasil.push([id, c, [
+    ...(lepas ? [`Termasuk ${lepas} attachment tidak terpasang`] : []), ...ket,
+    ...(komponen > 40 ? ["Lebih dari 40 komponen: indikator Weapon Smuggling, pertimbangkan Court Verdict (7)36"] : [])]]));
   return hasil;
 };
 </script>
@@ -246,12 +266,16 @@ function gambarDaftar(q = "") {
     .forEach(e => (kat[e.kat] ||= []).push(e));
   $("#daftar").innerHTML = Object.entries(kat).map(([k, list]) =>
     `<h2>${k}</h2>` + list.map(e => {
-      const ada = e.tipe === "cek";
-      const kontrol = ada
-        ? `<input type="checkbox" data-id="${e.id}" ${jml[e.id] ? "checked" : ""}>`
-        : `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${jml[e.id] || ""}">`;
-      const ket = ada ? "" : `<small>${e.satuan}${e.info ? " · " + e.info : ""}</small>`;
-      return `<label class="row"><span>${e.nama}${ket}</span>${kontrol}</label>`;
+      const v = jml[e.id] || 0;
+      const sub = e.tipe === "cek" ? "" : `<small>${e.tipe === "att" ? "" : e.satuan + (e.info ? " · " : "")}${e.info || ""}</small>`;
+      if (e.tipe === "att") return `<div class="row"><label for="c-${e.id}">${e.nama}${sub}</label><span class="ctl">` +
+        `<select data-id="${e.id}" data-att aria-label="Status ${e.nama}" ${v ? "" : "hidden"}>` +
+        `<option value="1"${v === 2 ? "" : " selected"}>Terpasang</option><option value="2"${v === 2 ? " selected" : ""}>Tidak terpasang</option></select>` +
+        `<input type="checkbox" id="c-${e.id}" data-id="${e.id}" data-att ${v ? "checked" : ""}></span></div>`;
+      const kontrol = e.tipe === "cek"
+        ? `<input type="checkbox" data-id="${e.id}" ${v ? "checked" : ""}>`
+        : `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${v || ""}">`;
+      return `<label class="row"><span>${e.nama}${sub}</span>${kontrol}</label>`;
     }).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
 }
 
@@ -262,7 +286,7 @@ function hitung() {
     p.n += n; p.utama ||= utama; p.ket.push(...ket);
     peta.set(id, p);
   };
-  EVIDENCE.forEach(e => jml[e.id] > 0 && e.pasal(jml[e.id]).forEach(tambah(!!e.utama)));
+  EVIDENCE.forEach(e => jml[e.id] > 0 && e.pasal(jml[e.id], jml).forEach(tambah(!!e.utama)));
   TOTAL(jml).forEach(tambah(false));
   return [...peta.values()].sort((a, b) => b.utama - a.utama);
 }
@@ -285,7 +309,12 @@ function gambarHasil() {
 }
 
 $("#daftar").addEventListener("input", e => {
-  jml[e.target.dataset.id] = e.target.type === "checkbox" ? +e.target.checked : Math.max(0, +e.target.value || 0);
+  const t = e.target, id = t.dataset.id;
+  if (t.dataset.att !== undefined) {
+    const cb = t.parentElement.querySelector("input"), sel = t.parentElement.querySelector("select");
+    sel.hidden = !cb.checked;
+    jml[id] = cb.checked ? +sel.value : 0;
+  } else jml[id] = t.type === "checkbox" ? +t.checked : Math.max(0, +t.value || 0);
   gambarHasil();
 });
 $("#cari").addEventListener("input", e => gambarDaftar(e.target.value));
