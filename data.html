@@ -18,8 +18,7 @@ input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--
 input[type=search]{width:100%}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .row small{display:block;color:var(--mute)}
-.row input[type=number]{width:96px;text-align:right;flex:none}
-.row input[type=checkbox]{width:24px;height:24px;flex:none;accent-color:var(--acc)}
+.row input{width:96px;text-align:right;flex:none}
 @media(min-width:800px){aside{position:sticky;top:16px}}
 ul{list-style:none;margin:0;padding:0}
 li{padding:10px 0;border-bottom:1px solid var(--line)}
@@ -30,77 +29,103 @@ li span{display:block;color:var(--mute);font-size:.9rem}
 .empty{color:var(--mute)}
 .btn{margin-top:12px;width:100%;padding:10px;border:0;border-radius:8px;background:var(--acc);color:var(--acc-ink);font:inherit;cursor:pointer}
 .btn:disabled{opacity:.4;cursor:default}
+[hidden]{display:none!important}
+.tabs{max-width:960px;margin:0 auto;padding:16px 16px 0;display:flex;flex-wrap:wrap;gap:8px}
+.tab{padding:8px 14px;border:1px solid var(--line);border-radius:999px;color:var(--ink);text-decoration:none;background:var(--card)}
+.tab[aria-selected=true]{background:var(--acc);border-color:var(--acc);color:var(--acc-ink)}
+.cek{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.cek input{width:22px;height:22px;flex:none;margin:1px 0 0;padding:0}
+.satu{grid-template-columns:1fr!important}
+.cat{color:var(--mute);font-size:.9rem;margin:0 0 8px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
+.status{font-weight:600;margin-bottom:8px}
+.status.tahan{color:#b3261e}
+@media(prefers-color-scheme:dark){.status.tahan{color:#f2b8b5}}
 .reset{background:none;border:0;color:var(--mute);font:inherit;cursor:pointer;padding:0;float:right}
 </style>
 </head>
 <body>
-<main>
+<nav class="tabs"><a class="tab" href="#pasal">Kalkulator pasal</a><a class="tab" href="#kendaraan">Keluarkan kendaraan</a><a class="tab" href="#senjata">Weapon class</a></nav>
+<main id="p-pasal">
   <section class="card">
-    <h1>Jenis kejahatan &amp; evidence</h1>
-    <input type="search" id="cari" placeholder="Cari, misalnya laundromat atau meth" autocomplete="off">
+    <h1>Evidence yang dibawa suspect</h1>
+    <input type="search" id="cari" placeholder="Cari evidence..." autocomplete="off">
     <div id="daftar"></div>
   </section>
   <aside class="card">
     <h1>Pasal yang dikenakan <button class="reset" id="reset">Reset</button></h1>
-    <div id="hasil"></div>
+    <ul id="hasil"></ul>
     <div class="total"><span>Total</span><span id="total">-</span></div>
     <div class="cv" id="cv"></div>
     <button class="btn" id="salin" disabled>Salin</button>
   </aside>
+</main>
+<main id="p-kendaraan" hidden>
+  <section class="card">
+    <h1>Pengecekan sebelum release</h1>
+    <div id="langkah"></div>
+    <h2>Hambatan (centang kalau ada)</h2>
+    <div id="blokir"></div>
+  </section>
+  <aside class="card">
+    <h1>Status <button class="reset" id="reset-rilis">Reset</button></h1>
+    <div class="status" id="status"></div>
+    <ul id="sisa"></ul>
+    <div class="total"><span>Biaya release</span><span id="biaya"></span></div>
+  </aside>
+</main>
+<main id="p-senjata" class="satu" hidden>
+  <section class="card">
+    <h1>Weapon class</h1>
+    <input type="search" id="cari-senjata" placeholder="Cari senjata..." autocomplete="off">
+    <div id="senjata-daftar"></div>
+  </section>
 </main>
 <script src="data.js"></script>
 <script>
 const $ = s => document.querySelector(s);
 const jml = {};
 const rp = n => "$" + n.toLocaleString("id-ID");
-const harga = p => p.cv ? "Court Verdict" : `${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE}`;
 
 function gambarDaftar(q = "") {
   const kat = {};
   EVIDENCE.filter(e => e.nama.toLowerCase().includes(q.toLowerCase()))
     .forEach(e => (kat[e.kat] ||= []).push(e));
   $("#daftar").innerHTML = Object.entries(kat).map(([k, list]) =>
-    `<h2>${k}</h2>` + list.map(e => {
-      const ada = e.tipe === "cek";
-      const kontrol = ada
-        ? `<input type="checkbox" data-id="${e.id}" ${jml[e.id] ? "checked" : ""}>`
-        : `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${jml[e.id] || ""}">`;
-      const ket = ada ? "" : `<small>${e.satuan}${e.info ? " · " + e.info : ""}</small>`;
-      return `<label class="row"><span>${e.nama}${ket}</span>${kontrol}</label>`;
-    }).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
+    `<h2>${k}</h2>` + list.map(e =>
+      `<label class="row"><span>${e.nama}<small>${e.satuan}</small></span>` +
+      `<input type="number" min="0" inputmode="numeric" placeholder="0" data-id="${e.id}" value="${jml[e.id] || ""}"></label>`
+    ).join("")).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
 }
 
 function hitung() {
   const peta = new Map();
-  const tambah = utama => ([id, n, ket = []]) => {
-    const p = peta.get(id) || { id, n: 0, utama: false, ket: [], ...PASAL[id] };
-    p.n += n; p.utama ||= utama; p.ket.push(...ket);
-    peta.set(id, p);
-  };
-  EVIDENCE.forEach(e => jml[e.id] > 0 && e.pasal(jml[e.id]).forEach(tambah(!!e.utama)));
-  TOTAL(jml).forEach(tambah(false));
-  return [...peta.values()].sort((a, b) => b.utama - a.utama);
+  const tambah = ([id, n]) => peta.set(id, (peta.get(id) || 0) + n);
+  EVIDENCE.forEach(e => jml[e.id] > 0 && e.pasal(jml[e.id]).forEach(tambah));
+  TOTAL(jml).forEach(tambah);
+  return [...peta].map(([id, n]) => ({ id, n, ...PASAL[id] }));
 }
 
 function gambarHasil() {
   const h = hitung();
-  const biasa = h.filter(p => !p.cv), cv = h.length - biasa.length;
+  const biasa = h.filter(p => !p.cv);
+  const cv = h.filter(p => p.cv);
   const f = biasa.reduce((a, p) => a + p.fine * p.n, 0);
   const s = biasa.reduce((a, p) => a + p.sentence * p.n, 0);
-  const item = p => `<li><b>${p.id} ${p.nama}${p.n > 1 ? ` ×${p.n}` : ""}</b><span>${harga(p)}</span>` +
-    [p.catatan, ...p.ket].filter(Boolean).map(k => `<span>${k}</span>`).join("") + `</li>`;
-  const blok = (judul, arr) => arr.length ? `<h2>${judul}</h2><ul>${arr.map(item).join("")}</ul>` : "";
   $("#hasil").innerHTML = h.length
-    ? blok("Kode utama", h.filter(p => p.utama)) + blok("Pasal lain", h.filter(p => !p.utama))
-    : '<p class="empty">Pilih jenis kejahatan atau isi evidence di samping.</p>';
-  $("#total").textContent = biasa.length ? `${rp(f)} / ${s} ${SATUAN_SENTENCE}` : "-";
-  $("#cv").textContent = cv ? `+ ${cv} pasal Court Verdict (tidak masuk total)` : "";
+    ? h.map(p => `<li><b>${p.id} ${p.nama}${p.n > 1 ? ` ×${p.n}` : ""}</b>` +
+        `<span>${p.cv ? "COURT VERDICT" : `${rp(p.fine * p.n)} · ${p.sentence * p.n} ${SATUAN_SENTENCE}`}</span>` +
+        (p.catatan ? `<span>${p.catatan}</span>` : "") + `</li>`).join("")
+    : '<li class="empty">Isi jumlah evidence di samping.</li>';
+  $("#total").textContent = biasa.length ? `${rp(f)} · ${s} ${SATUAN_SENTENCE}` : "-";
+  $("#cv").textContent = cv.length ? `+ ${cv.length} pasal Court Verdict (tidak masuk total)` : "";
   $("#salin").disabled = !h.length;
-  return { h, biasa, f, s, cv };
+  return { h, f, s, cv };
 }
 
 $("#daftar").addEventListener("input", e => {
-  jml[e.target.dataset.id] = e.target.type === "checkbox" ? +e.target.checked : Math.max(0, +e.target.value || 0);
+  jml[e.target.dataset.id] = Math.max(0, +e.target.value || 0);
   gambarHasil();
 });
 $("#cari").addEventListener("input", e => gambarDaftar(e.target.value));
@@ -110,18 +135,66 @@ $("#reset").addEventListener("click", () => {
   gambarHasil();
 });
 $("#salin").addEventListener("click", async e => {
-  const { h, biasa, f, s, cv } = gambarHasil();
-  const baris = p => `- ${p.id} ${p.nama}${p.n > 1 ? ` x${p.n}` : ""} (${harga(p)})`;
-  const blok = (judul, arr) => arr.length ? `${judul}:\n${arr.map(baris).join("\n")}\n` : "";
+  const { h, f, s, cv } = gambarHasil();
+  const baris = h.map(p => `- ${p.id} ${p.nama}${p.n > 1 ? ` x${p.n}` : ""} ` +
+    (p.cv ? "(Court Verdict)" : `(${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE})`));
   await navigator.clipboard.writeText(
-    blok("Main Penal Code", h.filter(p => p.utama)) + blok("Pasal lain", h.filter(p => !p.utama)) +
-    (biasa.length ? `Total: ${rp(f)} / ${s} ${SATUAN_SENTENCE}` : "") + (cv ? ` + ${cv} Court Verdict` : ""));
+    baris.join("\n") + `\nTotal: ${rp(f)} / ${s} ${SATUAN_SENTENCE}` + (cv.length ? ` + ${cv.length} Court Verdict` : ""));
   e.target.textContent = "Tersalin";
   setTimeout(() => (e.target.textContent = "Salin"), 1200);
 });
 
 gambarDaftar();
 gambarHasil();
+
+const cek = {};
+function gambarRilis() {
+  const kotak = (list, awalan) => list.map((t, i) =>
+    `<label class="cek"><input type="checkbox" data-k="${awalan}${i}" ${cek[awalan + i] ? "checked" : ""}><span>${t.nama || t}</span></label>`).join("");
+  $("#langkah").innerHTML = kotak(LANGKAH_RELEASE, "l");
+  $("#blokir").innerHTML = kotak(BLOKIR_RELEASE, "b");
+  $("#biaya").textContent = rp(BIAYA_RELEASE);
+  statusRilis();
+}
+function statusRilis() {
+  const blok = BLOKIR_RELEASE.filter((_, i) => cek["b" + i]);
+  const sisa = LANGKAH_RELEASE.filter((_, i) => !cek["l" + i]);
+  let judul, daftar;
+  if (blok.length) { judul = "TAHAN, jangan dikeluarkan"; daftar = blok.map(b => b.aksi); }
+  else if (sisa.length) { judul = `Belum selesai, ${sisa.length} pengecekan tersisa`; daftar = sisa; }
+  else { judul = "Bisa dikeluarkan"; daftar = [`Tagihkan biaya regulasi ${rp(BIAYA_RELEASE)}`, "Serahkan kunci kendaraan"]; }
+  $("#status").textContent = judul;
+  $("#status").classList.toggle("tahan", blok.length > 0);
+  $("#sisa").innerHTML = daftar.map(d => `<li>${d}</li>`).join("");
+}
+document.querySelector("#p-kendaraan").addEventListener("change", e => {
+  cek[e.target.dataset.k] = e.target.checked;
+  statusRilis();
+});
+$("#reset-rilis").addEventListener("click", () => { Object.keys(cek).forEach(k => delete cek[k]); gambarRilis(); });
+
+const PANEL = ["pasal", "kendaraan", "senjata"];
+function tab() {
+  const h = PANEL.includes(location.hash.slice(1)) ? location.hash.slice(1) : "pasal";
+  PANEL.forEach(p => ($("#p-" + p).hidden = p !== h));
+  document.querySelectorAll(".tab").forEach(a => a.setAttribute("aria-selected", a.hash === "#" + h));
+}
+function gambarSenjata(q = "") {
+  const c = q.toLowerCase();
+  $("#senjata-daftar").innerHTML = WEAPON.map(g => {
+    const l = g.senjata.filter(n => n.toLowerCase().includes(c));
+    if (!l.length) return "";
+    const p = g.pasal && PASAL[g.pasal];
+    return `<h2>${g.jenis} · Class ${g.kelas}</h2>` +
+      (p ? `<p class="cat">${g.pasal} ${p.nama} · ${rp(p.fine)} · ${p.sentence} ${SATUAN_SENTENCE}</p>` : "") +
+      `<div class="chips">${l.map(n => `<span class="chip">${n}</span>`).join("")}</div>`;
+  }).join("") || '<p class="empty">Tidak ada yang cocok.</p>';
+}
+$("#cari-senjata").addEventListener("input", e => gambarSenjata(e.target.value));
+addEventListener("hashchange", tab);
+gambarSenjata();
+gambarRilis();
+tab();
 </script>
 </body>
 </html>
