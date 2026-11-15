@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#121316">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='13' font-size='13'%3E🚓%3C/text%3E%3C/svg%3E">
 <title>Kalkulator Pasal LSPD</title>
 <style>
 :root{color-scheme:dark;--bg:#121316;--side:#17181c;--card:#1b1c21;--line:#2a2b32;--ink:#e8e8ec;--mute:#8b8c96;--acc:#6366f1;--acc-ink:#fff;--soft:rgba(99,102,241,.16);--soft-ink:#9a9df9;--bad:#f87171}
@@ -23,7 +25,7 @@ main{max-width:1100px;margin:0 auto;padding:24px;display:grid;gap:16px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
 .card h1{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin:0 0 12px;font-weight:600}
 h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;color:var(--soft-ink);margin:16px 0 4px}
-input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+input{font:inherit;font-size:16px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
 input:focus{outline:2px solid var(--acc);outline-offset:-1px}
 input[type=search]{width:100%}
 .row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
@@ -46,6 +48,11 @@ li span{display:block;color:var(--mute);font-size:.9rem}
 .cat{color:var(--mute);font-size:.9rem;margin:0 0 8px}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{padding:6px 12px;border:1px solid var(--line);border-radius:999px;background:var(--bg)}
+@media(max-width:999px){
+#p-pasal{padding-bottom:80px}
+#p-pasal .total{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:14px 16px;background:var(--side);border-top:1px solid var(--line);cursor:pointer}
+}
+@media(min-width:800px) and (max-width:999px){#p-pasal .total{left:220px}}
 @media(max-width:799px){
 .app{grid-template-columns:1fr}
 .side{position:static;height:auto;flex-direction:row;overflow-x:auto;padding:8px;border-right:0;border-bottom:1px solid var(--line)}
@@ -72,7 +79,7 @@ main{padding:16px}
   </section>
   <aside class="card">
     <h1>Pasal yang dikenakan <button class="reset" id="reset">Reset</button></h1>
-    <ul id="hasil"></ul>
+    <ul id="hasil" aria-live="polite"></ul>
     <div class="total"><span>Total</span><span id="total">-</span></div>
     <div class="cv" id="cv"></div>
     <button class="btn" id="salin" disabled>Salin</button>
@@ -87,7 +94,7 @@ main{padding:16px}
   </section>
   <aside class="card">
     <h1>Status <button class="reset" id="reset-rilis">Reset</button></h1>
-    <div class="status" id="status"></div>
+    <div class="status" id="status" aria-live="polite"></div>
     <ul id="sisa"></ul>
     <div class="total"><span>Biaya release</span><span id="biaya"></span></div>
   </aside>
@@ -101,7 +108,7 @@ main{padding:16px}
 </main>
 </div>
 </div>
-<script src="data.js"></script>
+<script src="data.js?v=1"></script>
 <script>
 const $ = s => document.querySelector(s);
 const jml = {};
@@ -157,12 +164,14 @@ $("#salin").addEventListener("click", async e => {
   const { h, f, s, cv } = gambarHasil();
   const baris = h.map(p => `- ${p.id} ${p.nama}${p.n > 1 ? ` x${p.n}` : ""} ` +
     (p.cv ? "(Court Verdict)" : `(${rp(p.fine * p.n)} / ${p.sentence * p.n} ${SATUAN_SENTENCE})`));
-  await navigator.clipboard.writeText(
+  const teks = (
     baris.join("\n") + `\nTotal: ${rp(f)} / ${s} ${SATUAN_SENTENCE}` + (cv.length ? ` + ${cv.length} Court Verdict` : ""));
-  e.target.textContent = "Tersalin";
+  try { await navigator.clipboard.writeText(teks); e.target.textContent = "Tersalin"; }
+  catch { e.target.textContent = "Gagal menyalin"; }
   setTimeout(() => (e.target.textContent = "Salin"), 1200);
 });
 
+$("#p-pasal .total").addEventListener("click", () => $("#hasil").scrollIntoView({ behavior: "smooth" }));
 gambarDaftar();
 gambarHasil();
 
